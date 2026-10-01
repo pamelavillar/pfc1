@@ -1,0 +1,16 @@
+# Dataset M5
+m5-forecasting-accuracy/*.csv
+
+# Archivos Python
+__pycache__/
+*.pyc
+
+# Entornos virtuales
+venv/
+.venv/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Mac
+.DS_Store
