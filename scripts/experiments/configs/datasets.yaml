@@ -1,0 +1,20 @@
+name: m5_with_covariates
+  hf_repo: autogluon/fev_datasets
+  offset: -28
+  prediction_length: 28
+  num_rolls: 1
+  covariates_fields: [
+    'snap_CA', 
+    'snap_TX', 
+    'snap_WI', 
+    'sell_price', 
+    'event_type_1_Cultural',
+    'event_type_1_National', 
+    'event_type_1_Religious', 
+    'event_type_1_Sporting', 
+    'event_type_1_nan',
+    'event_type_2_Cultural', 
+    'event_type_2_Religious', 
+    'event_type_2_nan',
+   ]
+  series_fields: "target"
