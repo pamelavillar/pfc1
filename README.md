@@ -1,1 +1,0 @@
-Primer avance de implementación de ChronosX

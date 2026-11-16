@@ -4,8 +4,6 @@ import pandas as pd
 from gluonts.dataset.field_names import FieldName
 from gluonts.dataset.split import split
 from typing import List
-from .m5 import get_m5_dataset
-from .epf import get_epf_dataset
 
 
 def to_gluonts_univariate(
@@ -49,36 +47,24 @@ def to_gluonts_univariate(
     return gts_dataset
 
 
-def load_and_split_dataset(backtest_config: dict):
-    hf_repo = backtest_config.get("hf_repo", None)
-    filename = backtest_config.get("filename", None)
+def load_and_split_dataset(backtest_config: dict, num_series: int = 0, seed: int = 0, directory: str = "."):
+    """Carga M5 (version de bajo consumo de RAM, ver m5_lean.py) y la divide en train / test.
+
+    Este repositorio solo soporta el dataset `m5_with_covariates`.
+    """
+    from .m5_lean import build_m5
+
     dataset_name = backtest_config["name"]
+    if dataset_name != "m5_with_covariates":
+        raise ValueError(f"Solo se soporta 'm5_with_covariates' (recibido: '{dataset_name}')")
+
     offset = backtest_config["offset"]
     prediction_length = backtest_config["prediction_length"]
     num_rolls = backtest_config["num_rolls"]
     series_fields = backtest_config.get("series_fields")
     covariates_fields = backtest_config.get("covariates_fields")
 
-    if dataset_name == "m5_with_covariates":
-        ds = get_m5_dataset()
-
-    elif dataset_name in [
-        "epf_electricity_be_paper",
-        "epf_electricity_de_paper",
-        "epf_electricity_fr_paper",
-        "epf_electricity_np_paper",
-        "epf_electricity_pjm_paper",
-    ]:
-        ds = get_epf_dataset(dataset_name)
-
-    elif 'synthetic_datasets' in dataset_name:
-        ds = datasets.load_from_disk(filename)
-
-    else:
-        ds = datasets.load_dataset(
-            hf_repo, dataset_name, split="train", trust_remote_code=True, revision="84737b7a6f7e8eeb9d3be3c744c08be3a968f4ed"
-        )
-
+    ds = build_m5(num_series=num_series, seed=seed, directory=directory)
     ds.set_format("numpy")
 
     gts_dataset = to_gluonts_univariate(

@@ -1,3 +1,20 @@
+"""
+Version de bajo consumo de memoria del M5 de ChronosX (reemplaza a chronosx.utils.m5 del repo oficial).
+
+El original hace M5.load() (melt de ~60M filas + merges) y despues convierte todo
+a listas de Python con to_dict("list"): eso agota los 12 GB de Colab.
+Aqui se leen los CSV originales (descargados por datasetsforecast), se trabaja
+con matrices numpy float32 y se escribe el dataset por bloques.
+
+Replica la logica de datasetsforecast.M5.load:
+  * serie = sales_train_evaluation + sales_test_evaluation (d_1..d_1969)
+  * se eliminan los ceros iniciales de cada serie
+  * join interno con sell_prices (se descartan filas sin precio)
+  * covariables: snap_CA/TX/WI, sell_price y one-hot de event_type_1/2
+
+Salida: dataset HF con las columnas que espera la config `m5_with_covariates`.
+Uso:  python -m chronosx.utils.m5_lean [--num_series N --seed S]
+"""
 import shutil
 from pathlib import Path
 
