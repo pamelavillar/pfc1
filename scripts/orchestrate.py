@@ -78,53 +78,16 @@ def summarize():
     if not runs:
         log("No hay corridas finales terminadas todavia.")
         return
-    state = json.load(open(root / "state.json")) if (root / "state.json").exists() else {}
     b = runs[0]["baseline"]
-    L = []
-    L.append(f"# Resumen: {args.dataset}  ({runs[0].get('n_series', '?')} series x {runs[0]['num_rolls']} ventana(s) "
-             f"= {runs[0]['n_items']} pronosticos)\n")
-    L.append(f"Pasos por corrida: {runs[0]['max_steps']} | lr elegido: {runs[0]['lr']} | "
-             f"corridas terminadas: {len(runs)}/{args.final_runs}\n")
-    if state.get("sweep"):
-        L.append("Barrido de lr (perdida de validacion de ChronosX, menor es mejor): "
-                 + ", ".join(f"lr={k}: {v:.4f}" for k, v in state["sweep"].items()) + "\n")
-    L.append("| run | val_loss zero-shot | val_loss ChronosX | MASE Chronos | MASE ChronosX | cambio MASE | "
-             "IC95 MASE | WQL Chronos | WQL ChronosX | cambio WQL | IC95 WQL |")
-    L.append("|---|---|---|---|---|---|---|---|---|---|---|")
-    mase_cx, wql_cx = [], []
-    for r in runs:
-        cx, bo = r["chronosx"], r["paired_bootstrap"]
-        mase_cx.append(cx["MASE[0.5]"])
-        wql_cx.append(cx["mean_weighted_sum_quantile_loss"])
-        ci_m = f"[{bo['mase_rel_pct_ci95'][0]:+.2f}, {bo['mase_rel_pct_ci95'][1]:+.2f}]%" if bo else "n/a"
-        ci_w = f"[{bo['wql_rel_pct_ci95'][0]:+.2f}, {bo['wql_rel_pct_ci95'][1]:+.2f}]%" if bo else "n/a"
-        L.append(
-            f"| {r['run_id']} | {r['val_loss_zero_shot']:.4f} | {r['val_loss_chronosx']:.4f} | "
-            f"{b['MASE[0.5]']:.4f} | {cx['MASE[0.5]']:.4f} | {r['rel_change_pct']['MASE']:+.2f}% | {ci_m} | "
-            f"{b['mean_weighted_sum_quantile_loss']:.4f} | {cx['mean_weighted_sum_quantile_loss']:.4f} | "
-            f"{r['rel_change_pct']['WQL']:+.2f}% | {ci_w} |"
-        )
-    sd = (lambda x: f"{np.std(x, ddof=1):.4f}" if len(x) > 1 else "n/a (1 sola corrida)")
-    mm, mw = float(np.mean(mase_cx)), float(np.mean(wql_cx))
+    metrics = [("MASE", "MASE[0.5]"), ("WQL", "mean_weighted_sum_quantile_loss")]
+    cx = {k: np.mean([r["chronosx"][k] for r in runs]) for _, k in metrics}
+
+    L = [f"{args.dataset} ({runs[0].get('n_series', '?')} series)", ""]
+    L.append("ChronosX:")
+    L += [f"- {name}: {cx[k]:.4f}" for name, k in metrics]
     L.append("")
-    L.append(f"**Promedio de {len(runs)} corridas** (ChronosX): MASE {mm:.4f} +- {sd(mase_cx)} | "
-             f"WQL {mw:.4f} +- {sd(wql_cx)}")
-    L.append(f"**Chronos zero-shot**: MASE {b['MASE[0.5]']:.4f} | WQL {b['mean_weighted_sum_quantile_loss']:.4f}")
-    L.append(f"**Cambio relativo del promedio**: MASE {100 * (mm - b['MASE[0.5]']) / b['MASE[0.5]']:+.2f}% | "
-             f"WQL {100 * (mw - b['mean_weighted_sum_quantile_loss']) / b['mean_weighted_sum_quantile_loss']:+.2f}%")
-    L.append("")
-    L.append("IC95 = bootstrap emparejado (remuestreo de series; de ventanas si el dataset es de una sola serie) del "
-             "cambio relativo de ChronosX frente a Chronos en esa corrida; si incluye 0, la diferencia no se "
-             "distingue de ruido de muestreo. "
-             "No incluye la variabilidad entre semillas de entrenamiento (para eso, mira la desviacion entre corridas).")
-    if args.dataset == "m5_with_covariates":
-        L.append("")
-        L.append(f"Referencia (valores que me pasaste del paper, no verificados): Chronos WQL "
-                 f"{PAPER_M5['Chronos']['WQL']} / MASE {PAPER_M5['Chronos']['MASE']}; ChronosX WQL "
-                 f"{PAPER_M5['ChronosX']['WQL']} / MASE {PAPER_M5['ChronosX']['MASE']}.")
-    tmin = [r["timing_min"].get("total") for r in runs]
-    L.append("")
-    L.append(f"Tiempo por corrida (min): {tmin}")
+    L.append("Chronos:")
+    L += [f"- {name}: {b[k]:.4f}" for name, k in metrics]
     (root / "summary.md").write_text("\n".join(L))
     json.dump({"runs": runs}, open(root / "summary.json", "w"), indent=1)
     print("\n".join(L))
