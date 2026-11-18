@@ -82,12 +82,31 @@ def summarize():
     metrics = [("MASE", "MASE[0.5]"), ("WQL", "mean_weighted_sum_quantile_loss")]
     cx = {k: np.mean([r["chronosx"][k] for r in runs]) for _, k in metrics}
 
+    # WQL en 0.1..0.9 (el de la comparacion con UniCA), desde las metricas por serie guardadas (19 cuantiles)
+    q19 = np.arange(0.05, 1, 0.05).round(2).tolist()
+    i9 = [q19.index(q) for q in (0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)]
+
+    def wql9(path):
+        d = np.load(path)
+        return float(np.mean(np.nansum(d["sql"][:, i9], axis=0) / np.nansum(d["abs"])))
+
+    cx_npz = [d / "item_metrics.npz" for d in sorted((root / "final").glob("run=*"))
+              if (d / "results.json").exists() and (d / "item_metrics.npz").exists()]
+    if cx_npz:
+        cx["WQL9"] = np.mean([wql9(f) for f in cx_npz])
+    base_npz = sorted((root / "baseline").glob("*.npz"), key=lambda f: len(np.load(f)["mase"]))
+    b = dict(b)
+    if base_npz:
+        b["WQL9"] = wql9(base_npz[-1])  # el de todas las series
+    metrics = [("MASE", "MASE[0.5]"), ("WQL (0.1-0.9)", "WQL9"),
+               ("WQL (19 cuantiles)", "mean_weighted_sum_quantile_loss")]
+
     L = [f"{args.dataset} ({runs[0].get('n_series', '?')} series)", ""]
     L.append("ChronosX:")
-    L += [f"- {name}: {cx[k]:.4f}" for name, k in metrics]
+    L += [f"- {name}: {cx[k]:.4f}" for name, k in metrics if k in cx]
     L.append("")
     L.append("Chronos:")
-    L += [f"- {name}: {b[k]:.4f}" for name, k in metrics]
+    L += [f"- {name}: {b[k]:.4f}" for name, k in metrics if k in b]
     (root / "summary.md").write_text("\n".join(L))
     json.dump({"runs": runs}, open(root / "summary.json", "w"), indent=1)
     print("\n".join(L))
